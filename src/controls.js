@@ -72,6 +72,8 @@ Autocompleter.Base = Class.create({
       };
     this.options.onHide = this.options.onHide ||
       function(element, update){ new Effect.Fade(update,{duration:0.15}) };
+    this.options.onSelect = this.options.onSelect ||
+      function(option) {return true;}
 
     if(typeof(this.options.tokens) == 'string')
       this.options.tokens = new Array(this.options.tokens);
@@ -86,6 +88,7 @@ Autocompleter.Base = Class.create({
     Element.hide(this.update);
 
     Event.observe(this.element, 'blur', this.onBlur.bindAsEventListener(this));
+    Event.observe(this.element, 'focus', this.onFocus.bindAsEventListener(this));
     Event.observe(this.element, 'keydown', this.onKeyPress.bindAsEventListener(this));
   },
 
@@ -131,6 +134,7 @@ Autocompleter.Base = Class.create({
        case Event.KEY_RETURN:
          this.selectEntry();
          Event.stop(event);
+         return;
        case Event.KEY_ESC:
          this.hide();
          this.active = false;
@@ -170,10 +174,9 @@ Autocompleter.Base = Class.create({
 
   onHover: function(event) {
     var element = Event.findElement(event, 'LI');
-    if(this.index != element.autocompleteIndex)
-    {
-        this.index = element.autocompleteIndex;
-        this.render();
+    if(this.index != element.autocompleteIndex) {
+      this.index = element.autocompleteIndex;
+      this.render();
     }
     Event.stop(event);
   },
@@ -182,14 +185,19 @@ Autocompleter.Base = Class.create({
     var element = Event.findElement(event, 'LI');
     this.index = element.autocompleteIndex;
     this.selectEntry();
-    this.hide();
   },
 
-  onBlur: function(event) {
+  onBlur: function() {
     // needed to make click events working
-    setTimeout(this.hide.bind(this), 250);
-    this.hasFocus = false;
-    this.active = false;
+    this._hideTimeout = setTimeout((function() {
+      this.hide();
+      this.hasFocus = false;
+      this.active = false;
+    }).bind(this), 250);
+  },
+
+  onFocus: function() {
+    clearTimeout(this._hideTimeout);
   },
 
   render: function() {
@@ -209,15 +217,35 @@ Autocompleter.Base = Class.create({
   },
 
   markPrevious: function() {
-    if(this.index > 0) this.index--;
-      else this.index = this.entryCount-1;
-    this.getEntry(this.index).scrollIntoView(true);
+    if (this.index > 0) {
+      this.index--;
+    } else {
+      this.index = this.entryCount - 1;
+      this.update.scrollTop = this.update.scrollHeight;
+    }
+
+    selection = this.getEntry(this.index);
+    selection_top = selection.offsetTop;
+
+    if (selection_top < this.update.scrollTop) {
+      this.update.scrollTop = this.update.scrollTop-selection.offsetHeight;
+    }
   },
 
   markNext: function() {
-    if(this.index < this.entryCount-1) this.index++;
-      else this.index = 0;
-    this.getEntry(this.index).scrollIntoView(false);
+    if (this.index < this.entryCount-1) {
+      this.index++;
+    } else {
+      this.index = 0;
+      this.update.scrollTop = 0;
+    }
+
+    selection = this.getEntry(this.index);
+    selection_bottom = selection.offsetTop+selection.offsetHeight;
+
+    if (selection_bottom > this.update.scrollTop+this.update.offsetHeight) {
+      this.update.scrollTop = this.update.scrollTop+selection.offsetHeight;
+    }
   },
 
   getEntry: function(index) {
@@ -229,8 +257,14 @@ Autocompleter.Base = Class.create({
   },
 
   selectEntry: function() {
-    this.active = false;
-    this.updateElement(this.getCurrentEntry());
+    var currentEntry = this.getCurrentEntry();
+    if (this.options.onSelect(currentEntry)) {
+      this.active = false;
+      this.updateElement(this.getCurrentEntry());
+      this.hide();
+    } else {
+      this.element.focus();
+    }
   },
 
   updateElement: function(selectedElement) {

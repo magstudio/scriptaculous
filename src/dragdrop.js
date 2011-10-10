@@ -236,7 +236,7 @@ var Draggable = Class.create({
         new Effect.Opacity(element, {duration:0.2, from:0.7, to:toOpacity,
           queue: {scope:'_draggable', position:'end'},
           afterFinish: function(){
-            Draggable._dragging[element] = false
+            Draggable._dragging[element] = false;
           }
         });
       },
@@ -454,7 +454,7 @@ var Draggable = Class.create({
 
   draw: function(point) {
     var pos = this.element.cumulativeOffset();
-    if(this.options.ghosting) {
+    if(this.options.ghosting || (this.options.scroll && this.options.scroll != window && this._isScrollChild)) {
       var r   = Position.realOffset(this.element);
       pos[0] += r[0] - Position.deltaX; pos[1] += r[1] - Position.deltaY;
     }
